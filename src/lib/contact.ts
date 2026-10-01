@@ -9,62 +9,47 @@ export interface ContactPayload {
   website: string
 }
 
-export type ContactDelivery = "endpoint" | "mailto"
+export type ContactDelivery = "sent"
 
 export interface ContactResult {
   delivery: ContactDelivery
-  mailtoHref?: string
 }
 
 /**
- * Sends a project inquiry.
- *
- * Set VITE_CONTACT_ENDPOINT to POST JSON to Formspree, a serverless function,
- * or any service that accepts:
- * { name, businessName, email, businessType, needs, website, source }
- *
- * Without an endpoint, this opens the visitor's email app with the message ready.
+ * Sends a project inquiry to the portfolio inbox.
+ * FormSubmit emails the message to site.email. The first submission asks that
+ * inbox to confirm the address; later ones arrive as normal mail.
+ * Set VITE_CONTACT_ENDPOINT to use a different JSON endpoint instead.
  */
-export function buildMailto(payload: ContactPayload) {
-  const body = [
-    `Name: ${payload.name}`,
-    `Business: ${payload.businessName}`,
-    `Email: ${payload.email}`,
-    `Business type: ${payload.businessType}`,
-    `Current website: ${payload.website || "None yet"}`,
-    "",
-    "What they need:",
-    payload.needs,
-  ].join("\n")
-
-  return `mailto:${site.email}?subject=${encodeURIComponent(
-    `Website request — ${payload.businessName}`,
-  )}&body=${encodeURIComponent(body)}`
-}
-
 export async function submitContactRequest(payload: ContactPayload): Promise<ContactResult> {
-  const endpoint = import.meta.env.VITE_CONTACT_ENDPOINT?.trim()
+  const endpoint = import.meta.env.VITE_CONTACT_ENDPOINT?.trim() || `https://formsubmit.co/ajax/${site.email}`
 
-  if (endpoint) {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        ...payload,
-        source: "demetre-portfolio",
-        _subject: `Website request — ${payload.businessName}`,
-      }),
-    })
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      name: payload.name,
+      email: payload.email,
+      business: payload.businessName,
+      businessType: payload.businessType,
+      website: payload.website || "None yet",
+      message: payload.needs,
+      _subject: `Website request — ${payload.businessName}`,
+      _replyto: payload.email,
+      _captcha: "false",
+      _template: "table",
+      source: "demetre-portfolio",
+    }),
+  })
 
-    if (!response.ok) {
-      throw new Error("Contact request failed")
-    }
-
-    return { delivery: "endpoint" }
+  const data = (await response.json().catch(() => null)) as { success?: string | boolean; message?: string } | null
+  const accepted = response.ok && data?.success !== false && data?.success !== "false"
+  if (!accepted) {
+    throw new Error(data?.message || "Contact request failed")
   }
 
-  return { delivery: "mailto", mailtoHref: buildMailto(payload) }
+  return { delivery: "sent" }
 }

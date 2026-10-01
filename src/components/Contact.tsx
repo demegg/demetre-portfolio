@@ -51,7 +51,7 @@ export function Contact() {
   const [values, setValues] = useState(empty)
   const [honeypot, setHoneypot] = useState("")
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({})
-  const [status, setStatus] = useState<"idle" | "sending" | "endpoint" | "mailto" | "error">("idle")
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle")
 
   function update(field: FieldName, value: string) {
     setValues((current) => ({ ...current, [field]: value }))
@@ -88,20 +88,14 @@ export function Contact() {
       return
     }
     if (honeypot) {
-      setStatus("endpoint")
+      setStatus("sent")
       return
     }
 
     setStatus("sending")
     try {
-      const result = await submitContactRequest(payload)
-      setStatus(result.delivery)
-      const mailtoHref = result.mailtoHref
-      if (mailtoHref) {
-        window.setTimeout(() => {
-          window.location.href = mailtoHref
-        }, 50)
-      }
+      await submitContactRequest(payload)
+      setStatus("sent")
     } catch {
       setStatus("error")
     }
@@ -142,13 +136,11 @@ export function Contact() {
           </div>
 
           <div className="border border-line bg-card p-5 sm:p-8">
-            {status === "endpoint" || status === "mailto" ? (
+            {status === "sent" ? (
               <div role="status" className="py-8">
-                <p className="text-2xl font-medium tracking-[-0.03em]">Message ready.</p>
+                <p className="text-2xl font-medium tracking-[-0.03em]">Request sent.</p>
                 <p className="mt-4 max-w-md leading-relaxed text-stone">
-                  {status === "mailto"
-                    ? "Your email app should open with this request filled in. If nothing opened, email me directly and I'll reply with ideas."
-                    : "Request sent. I'll get back to you with ideas for your website."}
+                  I have the message. I&apos;ll reply by email with ideas for your website.
                 </p>
                 <a href={site.mailto} className="mt-4 inline-flex font-medium text-ink underline decoration-accent underline-offset-4">
                   {site.email}
