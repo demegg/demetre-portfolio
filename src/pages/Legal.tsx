@@ -65,7 +65,7 @@ export function PrivacyPage() {
           The contact form asks for your name, business name, email, business type, what you need, and an optional current website. A hidden field is there to catch automated submissions. Leave it empty.
         </p>
         <p>
-          Submitting the form emails those details to me. The visitor’s address is the reply address, so I can answer from my inbox. The message is passed through FormSubmit in order to be delivered.
+          Submitting the form emails those details to me. Your address is the reply address, so I can answer from my inbox. The message is passed through FormSubmit in order to be delivered. The first submission asks me to confirm that inbox. After that confirmation, messages arrive as normal mail.
         </p>
         <p>I use that information to answer you about a website. I do not sell it, and I do not add you to a mailing list.</p>
       </Block>

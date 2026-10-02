@@ -15,10 +15,17 @@ export interface ContactResult {
   delivery: ContactDelivery
 }
 
+export class ContactConfirmationRequired extends Error {
+  constructor() {
+    super("Inbox confirmation required")
+    this.name = "ContactConfirmationRequired"
+  }
+}
+
 /**
  * Sends a project inquiry to the portfolio inbox.
- * FormSubmit emails the message to site.email. The first submission asks that
- * inbox to confirm the address; later ones arrive as normal mail.
+ * FormSubmit emails the message to site.email. Until that inbox is confirmed,
+ * FormSubmit keeps the submission and asks for a one-time activation click.
  * Set VITE_CONTACT_ENDPOINT to use a different JSON endpoint instead.
  */
 export async function submitContactRequest(payload: ContactPayload): Promise<ContactResult> {
@@ -48,6 +55,7 @@ export async function submitContactRequest(payload: ContactPayload): Promise<Con
   const data = (await response.json().catch(() => null)) as { success?: string | boolean; message?: string } | null
   const accepted = response.ok && data?.success !== false && data?.success !== "false"
   if (!accepted) {
+    if (/activat/i.test(data?.message ?? "")) throw new ContactConfirmationRequired()
     throw new Error(data?.message || "Contact request failed")
   }
 

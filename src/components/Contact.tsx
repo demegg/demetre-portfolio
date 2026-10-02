@@ -1,7 +1,7 @@
 import { useId, useState, type FormEvent } from "react"
 import { Link } from "react-router-dom"
 import { site } from "../data/site.ts"
-import { submitContactRequest, type ContactPayload } from "../lib/contact.ts"
+import { ContactConfirmationRequired, submitContactRequest, type ContactPayload } from "../lib/contact.ts"
 import { cx } from "../lib/cx.ts"
 import { Container } from "./ui.tsx"
 
@@ -35,8 +35,29 @@ function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
+function filledMailto(values: ContactPayload) {
+  const website = normalizeWebsite(values.website)
+  const body = [
+    `Name: ${values.name}`,
+    `Business: ${values.businessName}`,
+    `Email: ${values.email}`,
+    `Business type: ${values.businessType}`,
+    `Website: ${website || "None yet"}`,
+    "",
+    values.needs,
+  ].join("\n")
+  const subject = `Website request — ${values.businessName || "new inquiry"}`
+  return `mailto:${site.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+}
+
+function normalizeWebsite(value: string) {
+  const trimmed = value.trim()
+  if (/^https?:\/\/$/i.test(trimmed)) return ""
+  return trimmed
+}
+
 function isWebsite(value: string) {
-  if (!value.trim()) return true
+  if (!value) return true
   try {
     const withProtocol = /^https?:\/\//i.test(value) ? value : `https://${value}`
     const url = new URL(withProtocol)
@@ -51,7 +72,7 @@ export function Contact() {
   const [values, setValues] = useState(empty)
   const [honeypot, setHoneypot] = useState("")
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({})
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle")
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "confirm" | "error">("idle")
 
   function update(field: FieldName, value: string) {
     setValues((current) => ({ ...current, [field]: value }))
@@ -78,12 +99,13 @@ export function Contact() {
       email: values.email.trim(),
       businessType: values.businessType,
       needs: values.needs.trim(),
-      website: values.website.trim(),
+      website: normalizeWebsite(values.website),
     }
     const nextErrors = validate(payload)
     setErrors(nextErrors)
     const firstInvalid = (Object.keys(nextErrors) as FieldName[])[0]
     if (firstInvalid) {
+      if (status === "error") setStatus("idle")
       document.getElementById(`${formId}-${firstInvalid}`)?.focus()
       return
     }
@@ -96,8 +118,8 @@ export function Contact() {
     try {
       await submitContactRequest(payload)
       setStatus("sent")
-    } catch {
-      setStatus("error")
+    } catch (error) {
+      setStatus(error instanceof ContactConfirmationRequired ? "confirm" : "error")
     }
   }
 
@@ -161,6 +183,18 @@ export function Contact() {
                 <p id={`${formId}-note`} className="text-sm text-stone">
                   Fields marked with * are required.
                 </p>
+                {status === "confirm" ? (
+                  <div role="status" className="mt-4 bg-sand px-4 py-3 text-sm leading-relaxed text-ink">
+                    <p>
+                      Your message is saved. Open {site.email} and click Activate Form in the email from FormSubmit.
+                      Look in the inbox and in spam. That confirmation is only needed once, and this request arrives
+                      after it.
+                    </p>
+                    <a href={filledMailto(values)} className="mt-2 inline-flex font-medium underline decoration-accent underline-offset-4">
+                      Send this request from your email app
+                    </a>
+                  </div>
+                ) : null}
                 {status === "error" ? (
                   <p role="alert" className="mt-4 bg-[#f8e8e4] px-4 py-3 text-sm text-[#6f2214]">
                     The form couldn&apos;t be sent. Email {site.email} and I&apos;ll reply from there.
